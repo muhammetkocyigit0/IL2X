@@ -1398,6 +1398,15 @@ namespace IL2X.Core
 						{
 							// 'finally' instructions are injected before try, filter, catch exits or unhandled exceptions
 						}
+						else if (e.HandlerType == ExceptionHandlerType.Filter)
+						{
+							if (e.FilterStart == instruction)
+							{
+								writer.WriteLinePrefix($"/* filter */");
+								var objectType = FindTypeDefinitionByFullName("System.Object");
+								StackPush(objectType, "IL2X_ThreadExceptionObject", false);// pushed exception on eval stack
+							}
+						}
 						else
 						{
 							throw new NotImplementedException("Unsupported exception handler type: " + e.HandlerType);
@@ -1410,6 +1419,11 @@ namespace IL2X.Core
 							writer.WriteLinePrefix('}');
 							if (e == group.end && e.HandlerType != ExceptionHandlerType.Finally)
 							{
+                                if (e.HandlerType == ExceptionHandlerType.Filter)
+                                {
+									writer.RemoveTab();
+									writer.WriteLinePrefix('}');
+                                }
 								writer.WriteLinePrefix("/* throw unhandled exception */");
 								writer.WriteLinePrefix($"if (IL2X_ThreadExceptionObject != 0) longjmp(IL2X_ThreadExceptionJmpBuff, 1);");
 								writer.RemoveTab();
@@ -1467,6 +1481,14 @@ namespace IL2X.Core
 					// evaluation operations
 					case Code.Nop: break;
 					case Code.Endfinally: throw new Exception("Endfinally should be processed in Leave_X");
+                    case Code.Endfilter:
+                    {
+                        var result = stack.Pop();
+                        writer.WriteLinePrefix($"if ({result.value} == 1)");
+                        writer.WriteLinePrefix('{');
+                        writer.AddTab();
+                        break;
+                    }
 
 					// push to stack
 					case Code.Ldnull:
@@ -1640,6 +1662,14 @@ namespace IL2X.Core
 						var self = stack.Pop();
 						var field = (FieldReference)instruction.Operand;
 						Ldfld_X(self, field, true);
+						break;
+					}
+
+					case Code.Isinst:
+					{
+						var obj = stack.Pop();
+						var type = (TypeReference)instruction.Operand;
+						StackPush(obj.type, $"IL2X_IsType({obj.value}, &{GetRuntimeTypeReferenceFullName(GetTypeDefinition(type))}) ? {obj.value} : 0", false);
 						break;
 					}
 

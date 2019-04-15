@@ -54,10 +54,10 @@ namespace TestApp.Portable
 			{
 				try
 				{
-					throw new Exception("Test exception!");
-					//throw new MyException();
+					//throw new Exception("Test exception!");
+					throw new MyException();
 				}
-				catch (MyException e)
+				catch (MyException e) when (e != null)
 				{
 					Console.WriteLine("Caught my ex: " + e.Message);
 				}
